@@ -122,6 +122,37 @@ async def test_encrypted_push_sends_ciphertext_only(client_to, bark_server_recei
     assert "body" not in sent and "title" not in sent
 
 
+async def test_encrypted_push_passes_id_and_delete_in_plaintext(
+    client_to, bark_server_received
+):
+    """Keep routing fields outside and client archive settings inside ciphertext."""
+    async with aiohttp.ClientSession() as session:
+        client = client_to(
+            session=session, encryption="aes-128-cbc", encryption_key=ENC_KEY
+        )
+        await client.push(
+            BarkPayload(
+                body="secret", id="msg-1", delete=True,
+                group="home", ttl=600, is_archive=True,
+            )
+        )
+    sent = bark_server_received["json"]
+    assert set(sent) == {"ciphertext", "iv", "id", "delete"}
+    assert sent["id"] == "msg-1"
+    assert sent["delete"] == "1"
+    # Bark reads archive settings from the decrypted notification payload.
+    iv_bytes = sent["iv"].encode("utf-8")
+    cipher = Cipher(algorithms.AES(ENC_KEY.encode("utf-8")), modes.CBC(iv_bytes))
+    decryptor = cipher.decryptor()
+    padded = decryptor.update(base64.b64decode(sent["ciphertext"])) + decryptor.finalize()
+    unpadder = PKCS7(128).unpadder()
+    plaintext = unpadder.update(padded) + unpadder.finalize()
+    decoded = json.loads(plaintext.decode("utf-8"))
+    assert decoded == {
+        "body": "secret", "group": "home", "ttl": 600, "isArchive": "1"
+    }
+
+
 async def test_encrypted_push_roundtrip_decrypts(client_to, bark_server_received):
     async with aiohttp.ClientSession() as session:
         client = client_to(

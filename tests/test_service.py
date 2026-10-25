@@ -3,9 +3,10 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er, device_registry as dr
+from homeassistant.helpers.service import async_get_all_descriptions
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bark.bark_api import BarkAuthError, BarkPayload
@@ -84,6 +85,15 @@ async def _setup_entry(hass: HomeAssistant, enable_custom_integrations):
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
     return entry
+
+
+async def test_service_send_does_not_advertise_response(
+    hass: HomeAssistant, enable_custom_integrations
+):
+    await _setup_entry(hass, enable_custom_integrations)
+    assert hass.services.supports_response(DOMAIN, "send") is SupportsResponse.NONE
+    descriptions = await async_get_all_descriptions(hass)
+    assert "response" not in descriptions[DOMAIN]["send"]
 
 
 async def test_service_send_calls_client_push(

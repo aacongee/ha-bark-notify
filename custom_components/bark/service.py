@@ -173,5 +173,5 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             await do_push(hass, entry_id, payload)
 
     hass.services.async_register(
-        DOMAIN, SERVICE_SEND, handle_send, schema=SERVICE_SCHEMA, supports_response=False
+        DOMAIN, SERVICE_SEND, handle_send, schema=SERVICE_SCHEMA
     )
