@@ -219,9 +219,15 @@ class BarkClient:
     async def push(self, payload: BarkPayload) -> BarkResponse:
         body = payload.to_bark_dict()
         if self._encryption == EncryptionAlgorithm.AES_128_CBC.value:
+            # Extract id and delete before encryption — these must be sent
+            # in plaintext so the Bark server can update/delete notifications.
+            plaintext_fields: dict[str, Any] = {}
+            for key in ("id", "delete"):
+                if key in body:
+                    plaintext_fields[key] = body.pop(key)
             payload_json = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
             ciphertext, iv = encrypt_payload(payload_json, self._encryption_key or "")
-            body = {"ciphertext": ciphertext, "iv": iv}
+            body = {"ciphertext": ciphertext, "iv": iv, **plaintext_fields}
         url = f"{self._server_url}/{self._device_key}"
         session = self._get_session()
         try:
